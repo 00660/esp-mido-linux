@@ -97,6 +97,26 @@ sudo mount --bind /dev/pts "${CHROOT_DIR}/dev/pts"
 sudo mount --bind /sys "${CHROOT_DIR}/sys"
 sudo cp /etc/resolv.conf "${CHROOT_DIR}/etc/resolv.conf"
 sudo cp /etc/hosts "${CHROOT_DIR}/etc/hosts"
+sudo mkdir -p "${CHROOT_DIR}/etc/default"
+if [ ! -f "${CHROOT_DIR}/etc/default/keyboard" ]; then
+  sudo tee "${CHROOT_DIR}/etc/default/keyboard" >/dev/null <<'EOF'
+XKBMODEL="pc105"
+XKBLAYOUT="us"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+fi
+if [ ! -f "${CHROOT_DIR}/etc/default/console-setup" ]; then
+  sudo tee "${CHROOT_DIR}/etc/default/console-setup" >/dev/null <<'EOF'
+ACTIVE_CONSOLES="/dev/tty[1-6]"
+CHARMAP="UTF-8"
+CODESET="guess"
+FONTFACE="Fixed"
+FONTSIZE="8x16"
+VIDEOMODE=
+EOF
+fi
 sudo mkdir -p "${CHROOT_DIR}/tmp/kernel"
 sudo cp "${KERNEL_OUT_DIR}"/*.deb "${CHROOT_DIR}/tmp/kernel/"
 QEMU_AARCH64="$(command -v qemu-aarch64 || true)"
