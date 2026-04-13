@@ -67,16 +67,14 @@ jobs:
             make \
             mkbootimg \
             pkg-config \
+            proot \
             python3 \
             qemu-user \
-            qemu-user-binfmt \
             rsync \
             unzip \
             zip \
             xz-utils \
             zstd
-          sudo systemctl restart systemd-binfmt || sudo systemctl restart binfmt-support || true
-          test -e /proc/sys/fs/binfmt_misc/qemu-aarch64
 
       - name: Build Full Flash Package
         run: bash gemini-build/build-kernel.sh

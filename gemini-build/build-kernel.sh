@@ -99,13 +99,20 @@ sudo cp /etc/resolv.conf "${CHROOT_DIR}/etc/resolv.conf"
 sudo cp /etc/hosts "${CHROOT_DIR}/etc/hosts"
 sudo mkdir -p "${CHROOT_DIR}/tmp/kernel"
 sudo cp "${KERNEL_OUT_DIR}"/*.deb "${CHROOT_DIR}/tmp/kernel/"
-
-if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
-  echo "qemu-aarch64 binfmt is not registered" >&2
+QEMU_AARCH64="$(command -v qemu-aarch64 || true)"
+if [ -z "${QEMU_AARCH64}" ]; then
+  echo "qemu-aarch64 is not installed" >&2
   exit 1
 fi
 
-sudo chroot "${CHROOT_DIR}" /bin/bash -c '
+sudo proot -w / \
+  -b /proc:/proc \
+  -b /sys:/sys \
+  -b /dev:/dev \
+  -b /dev/pts:/dev/pts \
+  -q "${QEMU_AARCH64}" \
+  -r "${CHROOT_DIR}" \
+  /bin/bash -c '
 set -e
 dpkg -l | grep -E "linux-headers|linux-image" | awk "{print \$2}" | xargs -r dpkg -P
 rm -rf /lib/modules/*
