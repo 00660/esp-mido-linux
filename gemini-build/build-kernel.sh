@@ -100,7 +100,11 @@ sudo cp /etc/hosts "${CHROOT_DIR}/etc/hosts"
 sudo cp /usr/bin/qemu-aarch64-static "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
 sudo mkdir -p "${CHROOT_DIR}/tmp/kernel"
 sudo cp "${KERNEL_OUT_DIR}"/*.deb "${CHROOT_DIR}/tmp/kernel/"
-sudo update-binfmts --enable qemu-aarch64 || true
+
+if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+  echo "qemu-aarch64 binfmt is not registered" >&2
+  exit 1
+fi
 
 sudo chroot "${CHROOT_DIR}" /bin/bash -c '
 set -e

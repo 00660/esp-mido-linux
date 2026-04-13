@@ -68,13 +68,16 @@ jobs:
             mkbootimg \
             pkg-config \
             python3 \
+            qemu-user \
+            qemu-user-binfmt \
             qemu-user-static \
             rsync \
             unzip \
             zip \
             xz-utils \
             zstd
-          sudo update-binfmts --enable qemu-aarch64 || true
+          sudo systemctl restart systemd-binfmt || sudo systemctl restart binfmt-support || true
+          test -e /proc/sys/fs/binfmt_misc/qemu-aarch64
 
       - name: Build Full Flash Package
         run: bash gemini-build/build-kernel.sh
