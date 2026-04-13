@@ -74,6 +74,7 @@ jobs:
             zip \
             xz-utils \
             zstd
+          sudo update-binfmts --enable qemu-aarch64 || true
 
       - name: Build Full Flash Package
         run: bash gemini-build/build-kernel.sh

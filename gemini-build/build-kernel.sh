@@ -100,8 +100,9 @@ sudo cp /etc/hosts "${CHROOT_DIR}/etc/hosts"
 sudo cp /usr/bin/qemu-aarch64-static "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
 sudo mkdir -p "${CHROOT_DIR}/tmp/kernel"
 sudo cp "${KERNEL_OUT_DIR}"/*.deb "${CHROOT_DIR}/tmp/kernel/"
+sudo update-binfmts --enable qemu-aarch64 || true
 
-sudo chroot "${CHROOT_DIR}" /usr/bin/qemu-aarch64-static /bin/bash -lc '
+sudo chroot "${CHROOT_DIR}" /bin/bash -c '
 set -e
 dpkg -l | grep -E "linux-headers|linux-image" | awk "{print \$2}" | xargs -r dpkg -P
 rm -rf /lib/modules/*
