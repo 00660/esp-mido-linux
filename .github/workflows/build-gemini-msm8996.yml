@@ -34,13 +34,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            apt-utils \
             android-sdk-libsparse-utils \
             bc \
             bison \
+            binutils-aarch64-linux-gnu \
+            bzip2 \
             build-essential \
+            ca-certificates \
             cpio \
             curl \
             debhelper \
+            dpkg-dev \
             device-tree-compiler \
             dwarves \
             fakeroot \
@@ -48,11 +53,18 @@ jobs:
             gcc-aarch64-linux-gnu \
             gcc-arm-none-eabi \
             git \
+            kmod \
+            libdw-dev \
             libelf-dev \
             libfdt-dev \
+            libncurses-dev \
+            libpci-dev \
             libssl-dev \
+            lz4 \
+            lzop \
             make \
             mkbootimg \
+            pkg-config \
             python3 \
             rsync \
             xz-utils \
@@ -65,8 +77,9 @@ jobs:
         run: bash gemini-build/build-lk2nd.sh
 
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gemini-msm8996-${{ env.KERNEL_TAG }}
-          if-no-files-found: error
+          if-no-files-found: warn
           path: out/**
