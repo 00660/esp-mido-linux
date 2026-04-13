@@ -1,0 +1,72 @@
+name: build-gemini-msm8996
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_tag:
+        description: "msm8996-mainline tag"
+        required: true
+        default: "v6.19.5-msm8996"
+      rootfs_uuid:
+        description: "Existing rootfs UUID for Android boot repack helper"
+        required: true
+        default: "93afcbbe-875f-49b0-83da-ee8193f20ca5"
+  push:
+    paths:
+      - ".github/workflows/build-gemini-msm8996.yml"
+      - "gemini-build/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      KERNEL_TAG: ${{ inputs.kernel_tag || 'v6.19.5-msm8996' }}
+      ROOTFS_UUID: ${{ inputs.rootfs_uuid || '93afcbbe-875f-49b0-83da-ee8193f20ca5' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            android-sdk-libsparse-utils \
+            bc \
+            bison \
+            build-essential \
+            cpio \
+            curl \
+            debhelper \
+            device-tree-compiler \
+            dwarves \
+            fakeroot \
+            flex \
+            gcc-aarch64-linux-gnu \
+            gcc-arm-none-eabi \
+            git \
+            libelf-dev \
+            libfdt-dev \
+            libssl-dev \
+            make \
+            mkbootimg \
+            python3 \
+            rsync \
+            xz-utils \
+            zstd
+
+      - name: Build kernel
+        run: bash gemini-build/build-kernel.sh
+
+      - name: Build lk2nd variants
+        run: bash gemini-build/build-lk2nd.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-msm8996-${{ env.KERNEL_TAG }}
+          if-no-files-found: error
+          path: out/**
