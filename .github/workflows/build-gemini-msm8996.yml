@@ -6,9 +6,9 @@ on:
       kernel_tag:
         description: "msm8996-mainline tag"
         required: true
-        default: "v6.19.5-msm8996"
+        default: "v6.1.14-msm8996"
       rootfs_uuid:
-        description: "Existing rootfs UUID for Android boot repack helper"
+        description: "Reserved input, full-flash build auto-detects the new rootfs UUID"
         required: true
         default: "93afcbbe-875f-49b0-83da-ee8193f20ca5"
   push:
@@ -22,9 +22,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 240
     env:
-      KERNEL_TAG: ${{ inputs.kernel_tag || 'v6.19.5-msm8996' }}
+      KERNEL_TAG: ${{ inputs.kernel_tag || 'v6.1.14-msm8996' }}
       ROOTFS_UUID: ${{ inputs.rootfs_uuid || '93afcbbe-875f-49b0-83da-ee8193f20ca5' }}
     steps:
       - name: Checkout
@@ -38,6 +38,7 @@ jobs:
             android-sdk-libsparse-utils \
             bc \
             bison \
+            binfmt-support \
             binutils-aarch64-linux-gnu \
             bzip2 \
             build-essential \
@@ -48,12 +49,15 @@ jobs:
             dpkg-dev \
             device-tree-compiler \
             dwarves \
+            e2fsprogs \
             fakeroot \
             flex \
             gcc-aarch64-linux-gnu \
             gcc-arm-none-eabi \
             git \
+            img2simg \
             kmod \
+            kernel-package \
             libdw-dev \
             libelf-dev \
             libfdt-dev \
@@ -66,15 +70,16 @@ jobs:
             mkbootimg \
             pkg-config \
             python3 \
+            qemu-user-static \
             rsync \
+            simg2img \
+            unzip \
+            zip \
             xz-utils \
             zstd
 
-      - name: Build kernel
+      - name: Build Full Flash Package
         run: bash gemini-build/build-kernel.sh
-
-      - name: Build lk2nd variants
-        run: bash gemini-build/build-lk2nd.sh
 
       - name: Upload artifacts
         if: always()
