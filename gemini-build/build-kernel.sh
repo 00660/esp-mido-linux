@@ -30,7 +30,7 @@ scripts/config --file .config --enable EXT2_FS
 scripts/config --file .config --set-str SYSTEM_TRUSTED_KEYS ""
 scripts/config --file .config --set-str SYSTEM_REVOCATION_KEYS ""
 
-yes "" | make olddefconfig
+make olddefconfig
 
 make -j"$(nproc)" Image.gz dtbs
 make -j"$(nproc)" DEB_BUILD_PROFILES=pkg.linux-upstream.nokernelheaders bindeb-pkg
