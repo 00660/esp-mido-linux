@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: BSD-3-Clause
+
+#include <skeleton64.dtsi>
+#include <lk2nd.dtsi>
+
+/ {
+	qcom,msm-id =
+		<QCOM_ID_MSM8996 0x20001>,
+		<QCOM_ID_MSM8996 0x30000>,
+		<QCOM_ID_MSM8996 0x30001>,
+		<QCOM_ID_MSM8996SG 0x10000>;
+	qcom,board-id = <31 0>, <32 0>;
+};
+
+&lk2nd {
+	model = "Xiaomi Mi 5 (relaxed)";
+	compatible = "xiaomi,gemini";
+};
