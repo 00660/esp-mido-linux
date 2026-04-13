@@ -28,8 +28,8 @@
   你当前确认可用的 `8` 号 `bootfs`
 - `images/lk2nd.img`
   当前搭配使用的 `lk`
-- `images/rootfs-simg.img`
-  当前刷机用 `rootfs`
+- `images/rootfs-simg.img.zip`
+  当前刷机用 `rootfs` 压缩包，解压后得到 `rootfs-simg.img`
 
 ## 安装 Web 面板
 
@@ -42,4 +42,4 @@ sudo apt-get -f install
 
 ## 说明
 
-`rootfs-simg.img` 体积较大，仓库通过 Git LFS 管理。
+大体积镜像和安装包通过 Git LFS 管理。
