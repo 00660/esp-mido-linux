@@ -33,17 +33,20 @@ scripts/config --file .config --set-str SYSTEM_REVOCATION_KEYS ""
 make olddefconfig
 
 make -j"$(nproc)" Image.gz dtbs
-make -j"$(nproc)" DEB_BUILD_PROFILES=pkg.linux-upstream.nokernelheaders bindeb-pkg
-
-popd >/dev/null
-
 mkdir -p "${OUT_DIR}/deb" "${OUT_DIR}/image" "${OUT_DIR}/helper"
 
-find "${WORK_DIR}" -maxdepth 2 -type f -name "*.deb" -print -exec cp {} "${OUT_DIR}/deb/" \;
 cp "${LINUX_DIR}/.config" "${OUT_DIR}/image/config-gemini-final"
 cp "${LINUX_DIR}/arch/arm64/boot/Image.gz" "${OUT_DIR}/image/"
 find "${LINUX_DIR}/arch/arm64/boot/dts/qcom" -maxdepth 1 -type f -name "*gemini*.dtb" -exec cp {} "${OUT_DIR}/image/" \;
 cp "${ROOT_DIR}/gemini-build/repack-android-boot.sh" "${OUT_DIR}/helper/"
+cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${OUT_DIR}/helper/"
+cp "${ROOT_DIR}/gemini-build/flash-boot-fastboot.bat" "${OUT_DIR}/helper/"
+
+make -j"$(nproc)" DEB_BUILD_PROFILES=pkg.linux-upstream.nokernelheaders bindeb-pkg
+
+popd >/dev/null
+
+find "${WORK_DIR}" -maxdepth 2 -type f -name "*.deb" -print -exec cp {} "${OUT_DIR}/deb/" \;
 
 {
   echo "kernel_tag=${KERNEL_TAG}"
