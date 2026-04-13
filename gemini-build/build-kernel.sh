@@ -20,6 +20,12 @@ git clone --depth 1 https://github.com/umeiko/KlipperPhonesLinux.git "${KPL_DIR}
 
 cp "${KPL_DIR}/LinuxKernels/msm8996/.config_gemini" "${LINUX_DIR}/.config"
 
+# Fix missing declaration of of_device_get_match_data() in this tag.
+if ! grep -q '^#include <linux/of.h>$' "${LINUX_DIR}/drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c"; then
+  sed -i '/^#include <linux\/of_platform.h>$/a #include <linux/of.h>' \
+    "${LINUX_DIR}/drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c"
+fi
+
 pushd "${LINUX_DIR}" >/dev/null
 
 scripts/config --file .config --set-str LOCALVERSION "-gemini-gh"
