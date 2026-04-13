@@ -70,7 +70,6 @@ jobs:
             python3 \
             qemu-user \
             qemu-user-binfmt \
-            qemu-user-static \
             rsync \
             unzip \
             zip \

@@ -97,7 +97,6 @@ sudo mount --bind /dev/pts "${CHROOT_DIR}/dev/pts"
 sudo mount --bind /sys "${CHROOT_DIR}/sys"
 sudo cp /etc/resolv.conf "${CHROOT_DIR}/etc/resolv.conf"
 sudo cp /etc/hosts "${CHROOT_DIR}/etc/hosts"
-sudo cp /usr/bin/qemu-aarch64-static "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
 sudo mkdir -p "${CHROOT_DIR}/tmp/kernel"
 sudo cp "${KERNEL_OUT_DIR}"/*.deb "${CHROOT_DIR}/tmp/kernel/"
 
