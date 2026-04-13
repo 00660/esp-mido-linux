@@ -1,0 +1,12 @@
+[Unit]
+Description=Mido Temperature Controlled Fan
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/mido-wifi-portal/mido_fan_control.py --config /etc/mido-wifi-portal/fan-control.json
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

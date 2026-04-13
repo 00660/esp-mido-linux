@@ -1,0 +1,4 @@
+sources/esp8266_powerkey_ota/.pio/
+sources/wifi-portal/__pycache__/
+packages/mido-wifi-portal_1.0.0_all/
+packages/mido-wifi-portal-build.zip

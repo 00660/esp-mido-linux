@@ -1,0 +1,13 @@
+[Unit]
+Description=Mido GPIO64 to ESP8266 Single-Wire Link
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/mido-wifi-portal/mido_esp_gpio_link.py --config /etc/mido-wifi-portal/esp-gpio-link.json
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

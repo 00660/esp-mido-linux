@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "chip": "/dev/gpiochip0",
+  "line": 65,
+  "start_temp": 35.0,
+  "full_temp": 60.0,
+  "min_duty": 30.0,
+  "max_duty": 30.0,
+  "hz": 100.0,
+  "poll_interval": 5.0,
+  "active_low": false
+}

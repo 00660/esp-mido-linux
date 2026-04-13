@@ -1,0 +1,13 @@
+{
+  "wifi_interface": "wlan0",
+  "hotspot_connection": "mido-setup-ap",
+  "hotspot_ssid": "mido-setup",
+  "hotspot_password": "12345678",
+  "bind_host": "0.0.0.0",
+  "bind_port": 80,
+  "check_host": "223.5.5.5",
+  "check_interval": 15,
+  "offline_threshold": 2,
+  "online_threshold": 2,
+  "reconnect_grace_seconds": 45
+}

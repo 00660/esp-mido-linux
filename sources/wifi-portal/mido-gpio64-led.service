@@ -1,0 +1,12 @@
+[Unit]
+Description=Mido GPIO64 PWM LED
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/mido-wifi-portal/gpio64_led_pwm.py --chip /dev/gpiochip0 --line 64 --duty 10 --hz 100 --auto-off-seconds 300
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
