@@ -10,6 +10,7 @@ INITRD="/boot/initrd.img-${KVER}"
 DTB="$(find "/usr/lib/linux-image-${KVER}/qcom" -maxdepth 1 -type f -name "*gemini*.dtb" | sort | head -n 1)"
 OUT_IMG="${PWD}/boot-${KVER}.img"
 WORK_DIR="$(mktemp -d)"
+MKBOOTIMG_PY="${WORK_DIR}/mkbootimg.py"
 
 cleanup() {
   rm -rf "${WORK_DIR}"
@@ -31,18 +32,27 @@ if [[ -z "${DTB}" || ! -f "${DTB}" ]]; then
   exit 1
 fi
 
+curl -L --retry 5 --retry-delay 5 \
+  --output "${MKBOOTIMG_PY}" \
+  "https://sources.debian.org/data/main/a/android-platform-tools/34.0.5-12/system/tools/mkbootimg/mkbootimg.py"
+
 cat "${VMLINUX}" "${DTB}" > "${WORK_DIR}/kernel-dtb"
 
-mkbootimg \
+python3 "${MKBOOTIMG_PY}" \
   --base 0x80000000 \
   --kernel_offset 0x00008000 \
   --ramdisk_offset 0x01000000 \
   --tags_offset 0x00000100 \
-  --pagesize 4096 \
+  --pagesize 2048 \
   --second_offset 0x00f00000 \
   --kernel "${WORK_DIR}/kernel-dtb" \
   --ramdisk "${INITRD}" \
   --cmdline "${BOOT_CMDLINE}" \
   -o "${OUT_IMG}"
+
+if [[ ! -s "${OUT_IMG}" ]]; then
+  echo "failed to create ${OUT_IMG}" >&2
+  exit 1
+fi
 
 echo "created ${OUT_IMG}"

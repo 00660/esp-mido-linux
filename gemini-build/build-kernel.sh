@@ -17,6 +17,7 @@ ROOT_IMG="${ROOTFS_WORK_DIR}/root.img"
 BASE_ROOTFS_URL="${BASE_ROOTFS_URL:-https://github.com/umeiko/KlipperPhonesLinux/releases/download/base_rootfs/klipperos_base_rootfs.zip}"
 PANEL_CMDLINE="${PANEL_CMDLINE:-mdss_mdp.panel=1:dsi:0:qcom,mdss_dsi_sharp_fhd_nt35695_cmd:1:none:cfg:single_dsi}"
 KERNEL_LOCALVERSION="${KERNEL_LOCALVERSION:--gemini-gh}"
+MKBOOTIMG_PY="${WORK_DIR}/mkbootimg.py"
 
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
@@ -184,8 +185,12 @@ if [ -z "${ROOTFS_UUID}" ]; then
   exit 1
 fi
 
+curl -L --retry 5 --retry-delay 5 \
+  --output "${MKBOOTIMG_PY}" \
+  "https://sources.debian.org/data/main/a/android-platform-tools/34.0.5-12/system/tools/mkbootimg/mkbootimg.py"
+
 cat "${LINUX_DIR}/arch/arm64/boot/Image.gz" "${DTB_PATH}" > "${FLASH_OUT_DIR}/kernel-dtb"
-mkbootimg --base 0x80000000 \
+python3 "${MKBOOTIMG_PY}" --base 0x80000000 \
   --kernel_offset 0x00008000 \
   --ramdisk_offset 0x01000000 \
   --tags_offset 0x00000100 \
@@ -195,9 +200,17 @@ mkbootimg --base 0x80000000 \
   --cmdline "console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 maxcpus=4 ${PANEL_CMDLINE}" \
   --kernel "${FLASH_OUT_DIR}/kernel-dtb" \
   -o "${FLASH_OUT_DIR}/boot.img"
+if [ ! -s "${FLASH_OUT_DIR}/boot.img" ]; then
+  echo "boot.img was not created" >&2
+  exit 1
+fi
 
 rm -f "${FLASH_OUT_DIR}/kernel-dtb" "${FLASH_OUT_DIR}/initrd.img"
 img2simg "${ROOT_IMG}" "${FLASH_OUT_DIR}/rootfs-simg.img"
+if [ ! -s "${FLASH_OUT_DIR}/rootfs-simg.img" ]; then
+  echo "rootfs-simg.img was not created" >&2
+  exit 1
+fi
 
 cp "${ROOT_DIR}/gemini-build/flash-gemini-full-fastboot.bat" "${FLASH_OUT_DIR}/"
 cp "${ROOT_DIR}/gemini-build/repack-android-boot.sh" "${FLASH_OUT_DIR}/"
