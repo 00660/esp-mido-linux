@@ -55,9 +55,7 @@ jobs:
             gcc-aarch64-linux-gnu \
             gcc-arm-none-eabi \
             git \
-            img2simg \
             kmod \
-            kernel-package \
             libdw-dev \
             libelf-dev \
             libfdt-dev \
@@ -72,7 +70,6 @@ jobs:
             python3 \
             qemu-user-static \
             rsync \
-            simg2img \
             unzip \
             zip \
             xz-utils \
