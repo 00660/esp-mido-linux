@@ -29,14 +29,14 @@ jobs:
         run: |
           docker --version
 
-      - name: Build Full Flash Package In Ubuntu 20.04
+      - name: Build Full Flash Package In Ubuntu 24.04
         run: |
           sudo docker run --rm --privileged \
             -e DEBIAN_FRONTEND=noninteractive \
             -e GITHUB_WORKSPACE=/workspace \
             -e KERNEL_TAG="${KERNEL_TAG}" \
             -v "${GITHUB_WORKSPACE}:/workspace" \
-            ubuntu:20.04 \
+            ubuntu:24.04 \
             /bin/bash -lc '
               set -euo pipefail
               apt-get update
@@ -56,7 +56,6 @@ jobs:
                 e2fsprogs \
                 fakeroot \
                 flex \
-                gcc-10-aarch64-linux-gnu \
                 gcc-aarch64-linux-gnu \
                 git \
                 img2simg \
