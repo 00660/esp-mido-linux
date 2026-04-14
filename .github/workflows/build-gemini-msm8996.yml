@@ -6,11 +6,7 @@ on:
       kernel_tag:
         description: "msm8996-mainline tag"
         required: true
-        default: "v6.1.14-msm8996"
-      rootfs_uuid:
-        description: "Reserved input, full-flash build auto-detects the new rootfs UUID"
-        required: true
-        default: "93afcbbe-875f-49b0-83da-ee8193f20ca5"
+        default: "v6.19.5-msm8996"
   push:
     paths:
       - ".github/workflows/build-gemini-msm8996.yml"
@@ -22,10 +18,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: 360
     env:
-      KERNEL_TAG: ${{ inputs.kernel_tag || 'v6.1.14-msm8996' }}
-      ROOTFS_UUID: ${{ inputs.rootfs_uuid || '93afcbbe-875f-49b0-83da-ee8193f20ca5' }}
+      KERNEL_TAG: ${{ inputs.kernel_tag || 'v6.19.5-msm8996' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,6 +50,7 @@ jobs:
             gcc-aarch64-linux-gnu \
             gcc-arm-none-eabi \
             git \
+            kernel-package \
             kmod \
             libdw-dev \
             libelf-dev \
@@ -67,14 +63,14 @@ jobs:
             make \
             mkbootimg \
             pkg-config \
-            proot \
             python3 \
-            qemu-user \
+            qemu-user-static \
             rsync \
             unzip \
             zip \
             xz-utils \
             zstd
+          sudo update-binfmts --enable qemu-aarch64 || true
 
       - name: Build Full Flash Package
         run: bash gemini-build/build-kernel.sh

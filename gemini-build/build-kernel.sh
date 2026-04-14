@@ -3,29 +3,32 @@ set -euo pipefail
 
 ROOT_DIR="${GITHUB_WORKSPACE:-$(cd "$(dirname "$0")/.." && pwd)}"
 WORK_DIR="${ROOT_DIR}/_work"
-KERNEL_WORK_DIR="${WORK_DIR}/kernel"
+KPL_DIR="${WORK_DIR}/KlipperPhonesLinux"
+SCRIPT_DIR="${KPL_DIR}/LinuxKernels/scripts"
+LINUX_DIR="${SCRIPT_DIR}/linux"
 ROOTFS_WORK_DIR="${WORK_DIR}/rootfs"
+UNPACK_DIR="${ROOTFS_WORK_DIR}/unpacked"
+ROOT_IMG_ZIP="${ROOTFS_WORK_DIR}/klipperos_base_rootfs.zip"
+ROOT_IMG="${SCRIPT_DIR}/root.img"
 OUT_DIR="${ROOT_DIR}/out"
 KERNEL_OUT_DIR="${OUT_DIR}/kernel"
 FLASH_OUT_DIR="${OUT_DIR}/fullflash"
-LINUX_DIR="${KERNEL_WORK_DIR}/linux"
-KPL_DIR="${KERNEL_WORK_DIR}/KlipperPhonesLinux"
-UNPACK_DIR="${ROOTFS_WORK_DIR}/unpacked"
-CHROOT_DIR="${ROOTFS_WORK_DIR}/chroot"
-ROOT_IMG_ZIP="${ROOTFS_WORK_DIR}/klipperos_base_rootfs.zip"
-ROOT_IMG="${ROOTFS_WORK_DIR}/root.img"
+TMP_MKBOOT_DIR="${SCRIPT_DIR}/tmp_mkboot"
+CHROOT_DIR="/mnt/chroot"
 BASE_ROOTFS_URL="${BASE_ROOTFS_URL:-https://github.com/umeiko/KlipperPhonesLinux/releases/download/base_rootfs/klipperos_base_rootfs.zip}"
-PANEL_CMDLINE="${PANEL_CMDLINE:-mdss_mdp.panel=1:dsi:0:qcom,mdss_dsi_sharp_fhd_nt35695_cmd:1:none:cfg:single_dsi}"
-KERNEL_LOCALVERSION="${KERNEL_LOCALVERSION:--gemini-gh}"
-MKBOOTIMG_PY="${WORK_DIR}/mkbootimg.py"
+KERNEL_TAG="${KERNEL_TAG:-v6.19.5-msm8996}"
+QEMU_STATIC="${QEMU_STATIC:-/usr/bin/qemu-aarch64-static}"
 
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
+export CC=aarch64-linux-gnu-gcc
+export DEBIAN_FRONTEND=noninteractive
 export KBUILD_BUILD_USER=codex
 export KBUILD_BUILD_HOST=github-actions
 
 cleanup() {
   set +e
+  sync
   if mountpoint -q "${CHROOT_DIR}/dev/pts"; then sudo umount "${CHROOT_DIR}/dev/pts"; fi
   if mountpoint -q "${CHROOT_DIR}/dev"; then sudo umount "${CHROOT_DIR}/dev"; fi
   if mountpoint -q "${CHROOT_DIR}/proc"; then sudo umount "${CHROOT_DIR}/proc"; fi
@@ -35,53 +38,29 @@ cleanup() {
 
 trap cleanup EXIT
 
-mkdir -p "${KERNEL_WORK_DIR}" "${ROOTFS_WORK_DIR}" "${KERNEL_OUT_DIR}" "${FLASH_OUT_DIR}" "${CHROOT_DIR}"
-rm -rf "${LINUX_DIR}" "${KPL_DIR}" "${UNPACK_DIR}"
-rm -f "${ROOT_IMG_ZIP}" "${ROOT_IMG}"
+rm -rf "${KPL_DIR}" "${ROOTFS_WORK_DIR}" "${OUT_DIR}"
+mkdir -p "${WORK_DIR}" "${ROOTFS_WORK_DIR}" "${UNPACK_DIR}" "${KERNEL_OUT_DIR}" "${FLASH_OUT_DIR}"
+sudo mkdir -p "${CHROOT_DIR}"
 
-git clone --depth 1 --branch "${KERNEL_TAG}" https://gitlab.com/msm8996-mainline/linux.git "${LINUX_DIR}"
 git clone --depth 1 https://github.com/umeiko/KlipperPhonesLinux.git "${KPL_DIR}"
 
-cp "${KPL_DIR}/LinuxKernels/msm8996/.config_gemini" "${LINUX_DIR}/.config"
+pushd "${SCRIPT_DIR}" >/dev/null
 
-# Fix a missing include in the panel driver on some msm8996 tags.
-if [ -f "${LINUX_DIR}/drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c" ] && \
-   ! grep -q '^#include <linux/of.h>$' "${LINUX_DIR}/drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c"; then
-  sed -i '/^#include <linux\/of_platform.h>$/a #include <linux/of.h>' \
-    "${LINUX_DIR}/drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c"
-fi
+git clone --depth 1 --branch "${KERNEL_TAG}" https://gitlab.com/msm8996-mainline/linux.git ./linux
+cp ../msm8996/.config_gemini ./linux/.config
 
-pushd "${LINUX_DIR}" >/dev/null
-
-scripts/config --file .config --set-str LOCALVERSION "${KERNEL_LOCALVERSION}"
-scripts/config --file .config --module NFT_COMPAT
-scripts/config --file .config --module IP_NF_RAW
-scripts/config --file .config --module IP6_NF_RAW
-scripts/config --file .config --enable CGROUP_BPF
-scripts/config --file .config --enable BPF_SYSCALL
-scripts/config --file .config --enable SECCOMP
-scripts/config --file .config --enable SECCOMP_FILTER
-scripts/config --file .config --enable NF_NAT_REDIRECT
-scripts/config --file .config --module NETFILTER_XT_MATCH_IPVS
-scripts/config --file .config --enable BOOT_CONFIG
-scripts/config --file .config --enable EXT2_FS
-scripts/config --file .config --set-str SYSTEM_TRUSTED_KEYS ""
-scripts/config --file .config --set-str SYSTEM_REVOCATION_KEYS ""
-
+pushd ./linux >/dev/null
 make olddefconfig
-
-make -j"$(nproc)" Image.gz dtbs
-make -j"$(nproc)" DEB_BUILD_PROFILES=pkg.linux-upstream.nokernelheaders bindeb-pkg
-
 popd >/dev/null
 
-find "${KERNEL_WORK_DIR}" -maxdepth 2 -type f -name "*.deb" -print -exec cp {} "${KERNEL_OUT_DIR}/" \;
-cp "${LINUX_DIR}/.config" "${KERNEL_OUT_DIR}/config-gemini-final"
-cp "${LINUX_DIR}/arch/arm64/boot/Image.gz" "${KERNEL_OUT_DIR}/"
-find "${LINUX_DIR}/arch/arm64/boot/dts/qcom" -maxdepth 1 -type f -name "*gemini*.dtb" -exec cp {} "${KERNEL_OUT_DIR}/" \;
+bash ./full_compile.sh
+
+find . -maxdepth 1 -type f -name "*.deb" -exec cp {} "${KERNEL_OUT_DIR}/" \;
+cp ./linux/.config "${KERNEL_OUT_DIR}/config-gemini-final"
+cp ./linux/arch/arm64/boot/Image.gz "${KERNEL_OUT_DIR}/"
+find ./linux/arch/arm64/boot/dts/qcom -maxdepth 1 -type f -name "*gemini*.dtb" -exec cp {} "${KERNEL_OUT_DIR}/" \;
 
 curl -L --retry 5 --retry-delay 5 --output "${ROOT_IMG_ZIP}" "${BASE_ROOTFS_URL}"
-mkdir -p "${UNPACK_DIR}"
 unzip -q "${ROOT_IMG_ZIP}" -d "${UNPACK_DIR}"
 
 ROOT_IMG_SOURCE="$(find "${UNPACK_DIR}" -maxdepth 2 -type f -name "*.img" | head -n 1)"
@@ -89,6 +68,8 @@ if [ -z "${ROOT_IMG_SOURCE}" ]; then
   echo "No root image found in ${ROOT_IMG_ZIP}" >&2
   exit 1
 fi
+
+rm -f "${ROOT_IMG}"
 cp "${ROOT_IMG_SOURCE}" "${ROOT_IMG}"
 
 sudo mount -o loop "${ROOT_IMG}" "${CHROOT_DIR}"
@@ -97,50 +78,20 @@ sudo mount --bind /dev "${CHROOT_DIR}/dev"
 sudo mount --bind /dev/pts "${CHROOT_DIR}/dev/pts"
 sudo mount --bind /sys "${CHROOT_DIR}/sys"
 sudo cp /etc/resolv.conf "${CHROOT_DIR}/etc/resolv.conf"
-sudo cp /etc/hosts "${CHROOT_DIR}/etc/hosts"
-sudo mkdir -p "${CHROOT_DIR}/etc/default"
-if [ ! -f "${CHROOT_DIR}/etc/default/keyboard" ]; then
-  sudo tee "${CHROOT_DIR}/etc/default/keyboard" >/dev/null <<'EOF'
-XKBMODEL="pc105"
-XKBLAYOUT="us"
-XKBVARIANT=""
-XKBOPTIONS=""
-BACKSPACE="guess"
-EOF
-fi
-if [ ! -f "${CHROOT_DIR}/etc/default/console-setup" ]; then
-  sudo tee "${CHROOT_DIR}/etc/default/console-setup" >/dev/null <<'EOF'
-ACTIVE_CONSOLES="/dev/tty[1-6]"
-CHARMAP="UTF-8"
-CODESET="guess"
-FONTFACE="Fixed"
-FONTSIZE="8x16"
-VIDEOMODE=
-EOF
-fi
-sudo mkdir -p "${CHROOT_DIR}/tmp/kernel"
-sudo cp "${KERNEL_OUT_DIR}"/*.deb "${CHROOT_DIR}/tmp/kernel/"
-QEMU_AARCH64="$(command -v qemu-aarch64 || true)"
-if [ -z "${QEMU_AARCH64}" ]; then
-  echo "qemu-aarch64 is not installed" >&2
+
+sudo cp ./*.deb "${CHROOT_DIR}/tmp/"
+sudo cp ./chroot_install_kernel.sh "${CHROOT_DIR}/tmp/install_kernel.sh"
+sudo chmod +x "${CHROOT_DIR}/tmp/install_kernel.sh"
+
+if [ ! -x "${QEMU_STATIC}" ]; then
+  echo "qemu-aarch64-static is not installed" >&2
   exit 1
 fi
 
-sudo proot -w / \
-  -b /proc:/proc \
-  -b /sys:/sys \
-  -b /dev:/dev \
-  -b /dev/pts:/dev/pts \
-  -q "${QEMU_AARCH64}" \
-  -r "${CHROOT_DIR}" \
-  /bin/bash -c '
-set -e
-dpkg -l | grep -E "linux-headers|linux-image" | awk "{print \$2}" | xargs -r dpkg -P
-rm -rf /lib/modules/*
-dpkg -i /tmp/kernel/*.deb
-'
+sudo cp "${QEMU_STATIC}" "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
+sudo chroot "${CHROOT_DIR}" /bin/bash -lc "export DEBIAN_FRONTEND=noninteractive; cd /tmp; /bin/bash ./install_kernel.sh"
 
-sudo rsync -a "${KPL_DIR}/LinuxKernels/msm8996/firmware/" "${CHROOT_DIR}/lib/firmware/"
+sudo rsync -a ../msm8996/firmware/ "${CHROOT_DIR}/lib/firmware/"
 sudo rm -f "${CHROOT_DIR}/lib/firmware/qcom/msm8996/gemini/adsp.mbn"
 sudo mkdir -p "${CHROOT_DIR}/etc/modprobe.d"
 sudo tee "${CHROOT_DIR}/etc/modprobe.d/msm8996-network-order.conf" >/dev/null <<'EOF'
@@ -161,57 +112,48 @@ echo 1 > /sys/class/pci_bus/0000\:01/rescan
 EOF
 fi
 
-INITRD_IMG="$(find "${CHROOT_DIR}/boot" -maxdepth 1 -type f -name 'initrd.img-*' | head -n 1)"
-if [ -z "${INITRD_IMG}" ]; then
-  echo "Failed to locate initrd in chroot boot directory" >&2
-  exit 1
-fi
-cp "${INITRD_IMG}" "${FLASH_OUT_DIR}/initrd.img"
-
-DTB_PATH="$(find "${LINUX_DIR}/arch/arm64/boot/dts/qcom" -maxdepth 1 -type f -name '*gemini*.dtb' | head -n 1)"
-if [ -z "${DTB_PATH}" ]; then
-  echo "Failed to locate gemini dtb" >&2
-  exit 1
-fi
-
-sudo sync
-cleanup
-trap cleanup EXIT
-
-sudo e2label "${ROOT_IMG}" rootfs || true
 ROOTFS_UUID="$(sudo blkid -s UUID -o value "${ROOT_IMG}")"
 if [ -z "${ROOTFS_UUID}" ]; then
   echo "Failed to detect rootfs UUID" >&2
   exit 1
 fi
 
-curl -L --retry 5 --retry-delay 5 \
-  --output "${MKBOOTIMG_PY}" \
-  "https://sources.debian.org/data/main/a/android-platform-tools/34.0.5-12/system/tools/mkbootimg/mkbootimg.py"
+cat > ./get_kernel_files.sh <<'EOF'
+mkdir ./tmp_mkboot
+rm -rf ./tmp_mkboot/*
+cp ./linux/arch/arm64/boot/dts/qcom/*gemini*.dtb ./tmp_mkboot/
+cp ./linux/arch/arm64/boot/Image.gz ./tmp_mkboot/
+cp /mnt/chroot/boot/initrd* ./tmp_mkboot/
+EOF
 
-cat "${LINUX_DIR}/arch/arm64/boot/Image.gz" "${DTB_PATH}" > "${FLASH_OUT_DIR}/kernel-dtb"
-python3 "${MKBOOTIMG_PY}" --base 0x80000000 \
-  --kernel_offset 0x00008000 \
-  --ramdisk_offset 0x01000000 \
-  --tags_offset 0x00000100 \
-  --pagesize 2048 \
-  --second_offset 0x00f00000 \
-  --ramdisk "${FLASH_OUT_DIR}/initrd.img" \
-  --cmdline "console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 maxcpus=4 ${PANEL_CMDLINE}" \
-  --kernel "${FLASH_OUT_DIR}/kernel-dtb" \
-  -o "${FLASH_OUT_DIR}/boot.img"
-if [ ! -s "${FLASH_OUT_DIR}/boot.img" ]; then
-  echo "boot.img was not created" >&2
-  exit 1
-fi
+cat > ./mkboot.sh <<EOF
+cp ./tmp_mkboot/initrd* ./tmp_mkboot/initrd.img
+cp ./tmp_mkboot/*gemini*.dtb ./tmp_mkboot/dtb
+cat ./tmp_mkboot/Image.gz ./tmp_mkboot/dtb > ./tmp_mkboot/kernel-dtb
+mkbootimg --base 0x80000000 \\
+        --kernel_offset 0x00008000 \\
+        --ramdisk_offset 0x01000000 \\
+        --tags_offset 0x00000100 \\
+        --pagesize 2048 \\
+        --second_offset 0x00f00000 \\
+        --ramdisk ./tmp_mkboot/initrd.img \\
+        --cmdline "console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 splash" \\
+        --kernel ./tmp_mkboot/kernel-dtb -o ./tmp_mkboot/boot.img
+rm ./tmp_mkboot/dtb
+rm ./tmp_mkboot/kernel-dtb
+rm ./tmp_mkboot/initrd.img
+rm -f ./tmp_mkboot/rootfs.img
+img2simg ./root.img ./tmp_mkboot/rootfs.img
+EOF
 
-rm -f "${FLASH_OUT_DIR}/kernel-dtb" "${FLASH_OUT_DIR}/initrd.img"
-img2simg "${ROOT_IMG}" "${FLASH_OUT_DIR}/rootfs-simg.img"
-if [ ! -s "${FLASH_OUT_DIR}/rootfs-simg.img" ]; then
-  echo "rootfs-simg.img was not created" >&2
-  exit 1
-fi
+chmod +x ./get_kernel_files.sh ./mkboot.sh
+sync
+bash ./get_kernel_files.sh
+bash ./mkboot.sh
 
+cp "${TMP_MKBOOT_DIR}/boot.img" "${FLASH_OUT_DIR}/"
+cp "${TMP_MKBOOT_DIR}/rootfs.img" "${FLASH_OUT_DIR}/rootfs.img"
+cp "${TMP_MKBOOT_DIR}/rootfs.img" "${FLASH_OUT_DIR}/rootfs-simg.img"
 cp "${ROOT_DIR}/gemini-build/flash-gemini-full-fastboot.bat" "${FLASH_OUT_DIR}/"
 cp "${ROOT_DIR}/gemini-build/repack-android-boot.sh" "${FLASH_OUT_DIR}/"
 cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${FLASH_OUT_DIR}/"
@@ -220,12 +162,13 @@ cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${FLASH_OUT_DIR}/"
   echo "kernel_tag=${KERNEL_TAG}"
   echo "rootfs_uuid=${ROOTFS_UUID}"
   echo "base_config=umeiko/KlipperPhonesLinux LinuxKernels/msm8996/.config_gemini"
-  echo "extra_config=NFT_COMPAT=m, IP_NF_RAW=m, IP6_NF_RAW=m, CGROUP_BPF=y, BPF_SYSCALL=y, SECCOMP=y, SECCOMP_FILTER=y, NF_NAT_REDIRECT=y, NETFILTER_XT_MATCH_IPVS=m, BOOT_CONFIG=y, EXT2_FS=y"
-  echo "cmdline=console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 maxcpus=4 ${PANEL_CMDLINE}"
-  echo "rootfs_partition=userdata"
+  echo "build_flow=umeiko tutorial chain"
+  echo "cmdline=console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 splash"
 } > "${FLASH_OUT_DIR}/build-info.txt"
 
 (
   cd "${OUT_DIR}"
   sha256sum kernel/* fullflash/* > SHA256SUMS
 )
+
+popd >/dev/null
