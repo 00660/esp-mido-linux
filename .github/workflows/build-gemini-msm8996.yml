@@ -29,27 +29,17 @@ jobs:
         run: |
           docker --version
 
-      - name: Build Full Flash Package In Ubuntu 24.04
+      - name: Build Full Flash Package In Ubuntu 20.04
         run: |
           sudo docker run --rm --privileged \
             -e DEBIAN_FRONTEND=noninteractive \
             -e GITHUB_WORKSPACE=/workspace \
             -e KERNEL_TAG="${KERNEL_TAG}" \
             -v "${GITHUB_WORKSPACE}:/workspace" \
-            ubuntu:24.04 \
+            ubuntu:20.04 \
             /bin/bash -lc '
               set -euo pipefail
               apt-get update
-              install_if_available() {
-                local pkg
-                for pkg in "$@"; do
-                  if apt-cache show "$pkg" >/dev/null 2>&1; then
-                    apt-get install -y "$pkg"
-                    return 0
-                  fi
-                done
-                return 1
-              }
               apt-get install -y \
                 sudo \
                 bc \
@@ -60,15 +50,17 @@ jobs:
                 cpio \
                 curl \
                 debhelper \
-                debootstrap \
                 dpkg-dev \
                 device-tree-compiler \
                 dwarves \
                 e2fsprogs \
                 fakeroot \
                 flex \
+                gcc-10-aarch64-linux-gnu \
                 gcc-aarch64-linux-gnu \
                 git \
+                img2simg \
+                kernel-package \
                 kmod \
                 libdw-dev \
                 libelf-dev \
@@ -79,17 +71,16 @@ jobs:
                 lz4 \
                 lzop \
                 make \
+                mkbootimg \
                 pkg-config \
                 python3 \
                 qemu-user-static \
                 rsync \
+                simg2img \
                 unzip \
                 zip \
                 xz-utils \
                 zstd
-              install_if_available android-sdk-libsparse-utils img2simg
-              install_if_available mkbootimg
-              install_if_available kernel-package || true
               update-binfmts --enable qemu-aarch64 || true
               cd /workspace
               bash gemini-build/build-kernel.sh
