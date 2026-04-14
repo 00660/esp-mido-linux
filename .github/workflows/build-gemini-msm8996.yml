@@ -25,55 +25,66 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Verify Docker
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            apt-utils \
-            android-sdk-libsparse-utils \
-            bc \
-            bison \
-            binfmt-support \
-            binutils-aarch64-linux-gnu \
-            bzip2 \
-            build-essential \
-            ca-certificates \
-            cpio \
-            curl \
-            debhelper \
-            dpkg-dev \
-            device-tree-compiler \
-            dwarves \
-            e2fsprogs \
-            fakeroot \
-            flex \
-            gcc-aarch64-linux-gnu \
-            gcc-arm-none-eabi \
-            git \
-            kernel-package \
-            kmod \
-            libdw-dev \
-            libelf-dev \
-            libfdt-dev \
-            libncurses-dev \
-            libpci-dev \
-            libssl-dev \
-            lz4 \
-            lzop \
-            make \
-            mkbootimg \
-            pkg-config \
-            python3 \
-            qemu-user-static \
-            rsync \
-            unzip \
-            zip \
-            xz-utils \
-            zstd
-          sudo update-binfmts --enable qemu-aarch64 || true
+          docker --version
 
-      - name: Build Full Flash Package
-        run: bash gemini-build/build-kernel.sh
+      - name: Build Full Flash Package In Ubuntu 20.04
+        run: |
+          sudo docker run --rm --privileged \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e GITHUB_WORKSPACE=/workspace \
+            -e KERNEL_TAG="${KERNEL_TAG}" \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            ubuntu:20.04 \
+            /bin/bash -lc '
+              apt-get update
+              apt-get install -y \
+                sudo \
+                bc \
+                bison \
+                binfmt-support \
+                build-essential \
+                ca-certificates \
+                cpio \
+                curl \
+                debhelper \
+                dpkg-dev \
+                device-tree-compiler \
+                dwarves \
+                e2fsprogs \
+                fakeroot \
+                flex \
+                gcc-10-aarch64-linux-gnu \
+                gcc-aarch64-linux-gnu \
+                git \
+                img2simg \
+                kernel-package \
+                kmod \
+                libdw-dev \
+                libelf-dev \
+                libfdt-dev \
+                libncurses-dev \
+                libpci-dev \
+                libssl-dev \
+                lz4 \
+                lzop \
+                make \
+                mkbootimg \
+                pkg-config \
+                python3 \
+                qemu-user-static \
+                rsync \
+                simg2img \
+                unzip \
+                zip \
+                xz-utils \
+                zstd
+              update-binfmts --enable qemu-aarch64 || true
+              cd /workspace
+              bash gemini-build/build-kernel.sh
+              chmod -R a+rX /workspace/out || true
+            '
 
       - name: Upload artifacts
         if: always()
