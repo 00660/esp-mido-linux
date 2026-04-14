@@ -40,15 +40,16 @@ chroot_run() {
 cleanup() {
   set +e
   sync
-  if mountpoint -q "${CHROOT_DIR}/dev/pts"; then sudo umount "${CHROOT_DIR}/dev/pts"; fi
-  if mountpoint -q "${CHROOT_DIR}/dev"; then sudo umount "${CHROOT_DIR}/dev"; fi
-  if mountpoint -q "${CHROOT_DIR}/proc"; then sudo umount "${CHROOT_DIR}/proc"; fi
-  if mountpoint -q "${CHROOT_DIR}/sys"; then sudo umount "${CHROOT_DIR}/sys"; fi
-  if mountpoint -q "${CHROOT_DIR}"; then sudo umount "${CHROOT_DIR}"; fi
+  sudo umount -lf "${CHROOT_DIR}/dev/pts" 2>/dev/null || true
+  sudo umount -lf "${CHROOT_DIR}/dev" 2>/dev/null || true
+  sudo umount -lf "${CHROOT_DIR}/proc" 2>/dev/null || true
+  sudo umount -lf "${CHROOT_DIR}/sys" 2>/dev/null || true
+  sudo umount -lf "${CHROOT_DIR}" 2>/dev/null || true
 }
 
 trap cleanup EXIT
 
+cleanup
 rm -rf "${KPL_DIR}" "${ROOTFS_WORK_DIR}" "${OUT_DIR}"
 mkdir -p "${WORK_DIR}" "${ROOTFS_WORK_DIR}" "${KERNEL_OUT_DIR}" "${FLASH_OUT_DIR}"
 sudo mkdir -p "${CHROOT_DIR}"
