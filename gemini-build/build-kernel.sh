@@ -19,6 +19,7 @@ BASE_ROOTFS_URL="${BASE_ROOTFS_URL:-https://github.com/umeiko/KlipperPhonesLinux
 KERNEL_TAG="${KERNEL_TAG:-v6.1.14-msm8996}"
 QEMU_STATIC="${QEMU_STATIC:-/usr/bin/qemu-aarch64-static}"
 RUNNING_CONFIG="${ROOT_DIR}/gemini-build/config-gemini-running-6.1.14-umeko-rv0"
+FIRMWARE_OVERLAY_DIR="${ROOT_DIR}/gemini-build/firmware-overlay"
 
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
@@ -110,6 +111,9 @@ sudo cp "${QEMU_STATIC}" "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
 sudo chroot "${CHROOT_DIR}" /bin/bash -lc "export DEBIAN_FRONTEND=noninteractive; cd /tmp; /bin/bash ./install_kernel.sh"
 
 sudo rsync -a ../msm8996/firmware/ "${CHROOT_DIR}/lib/firmware/"
+if [ -d "${FIRMWARE_OVERLAY_DIR}" ]; then
+  sudo rsync -a "${FIRMWARE_OVERLAY_DIR}/" "${CHROOT_DIR}/lib/firmware/"
+fi
 sudo rm -f "${CHROOT_DIR}/lib/firmware/qcom/msm8996/gemini/adsp.mbn"
 sudo mkdir -p "${CHROOT_DIR}/etc/modprobe.d"
 sudo tee "${CHROOT_DIR}/etc/modprobe.d/msm8996-network-order.conf" >/dev/null <<'EOF'
@@ -188,6 +192,9 @@ cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${FLASH_OUT_DIR}/"
     echo "base_config=gemini-build/config-gemini-running-6.1.14-umeko-rv0"
   else
     echo "base_config=umeiko/KlipperPhonesLinux LinuxKernels/msm8996/.config_gemini"
+  fi
+  if [ -d "${FIRMWARE_OVERLAY_DIR}" ]; then
+    echo "firmware_overlay=gemini-build/firmware-overlay"
   fi
   echo "build_flow=umeiko tutorial chain"
   echo "cmdline=console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 splash"
