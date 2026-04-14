@@ -108,7 +108,8 @@ if [ ! -x "${QEMU_STATIC}" ]; then
 fi
 
 sudo cp "${QEMU_STATIC}" "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
-sudo chroot "${CHROOT_DIR}" /bin/bash -lc "export DEBIAN_FRONTEND=noninteractive; cd /tmp; /bin/bash ./install_kernel.sh"
+sudo chroot "${CHROOT_DIR}" /usr/bin/qemu-aarch64-static /bin/bash -lc \
+  "export DEBIAN_FRONTEND=noninteractive; cd /tmp; /bin/bash ./install_kernel.sh"
 
 sudo rsync -a ../msm8996/firmware/ "${CHROOT_DIR}/lib/firmware/"
 if [ -d "${FIRMWARE_OVERLAY_DIR}" ]; then
