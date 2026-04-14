@@ -7,19 +7,25 @@ KPL_DIR="${WORK_DIR}/KlipperPhonesLinux"
 SCRIPT_DIR="${KPL_DIR}/LinuxKernels/scripts"
 LINUX_DIR="${SCRIPT_DIR}/linux"
 ROOTFS_WORK_DIR="${WORK_DIR}/rootfs"
-UNPACK_DIR="${ROOTFS_WORK_DIR}/unpacked"
-ROOT_IMG_ZIP="${ROOTFS_WORK_DIR}/klipperos_base_rootfs.zip"
 ROOT_IMG="${SCRIPT_DIR}/root.img"
+UBUNTU_BASE_TAR="${ROOTFS_WORK_DIR}/ubuntu-base-arm64.tar.gz"
 OUT_DIR="${ROOT_DIR}/out"
 KERNEL_OUT_DIR="${OUT_DIR}/kernel"
 FLASH_OUT_DIR="${OUT_DIR}/fullflash"
 TMP_MKBOOT_DIR="${SCRIPT_DIR}/tmp_mkboot"
 CHROOT_DIR="/mnt/chroot"
-BASE_ROOTFS_URL="${BASE_ROOTFS_URL:-https://github.com/umeiko/KlipperPhonesLinux/releases/download/base_rootfs/klipperos_base_rootfs.zip}"
 KERNEL_TAG="${KERNEL_TAG:-v6.1.14-msm8996}"
 QEMU_STATIC="${QEMU_STATIC:-/usr/bin/qemu-aarch64-static}"
 RUNNING_CONFIG="${ROOT_DIR}/gemini-build/config-gemini-running-6.1.14-umeko-rv0"
 FIRMWARE_OVERLAY_DIR="${ROOT_DIR}/gemini-build/firmware-overlay"
+UBUNTU_RELEASE="${UBUNTU_RELEASE:-25.10}"
+UBUNTU_SERIES="${UBUNTU_SERIES:-questing}"
+UBUNTU_BASE_URL="${UBUNTU_BASE_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/${UBUNTU_SERIES}/release/ubuntu-base-${UBUNTU_RELEASE}-base-arm64.tar.gz}"
+ROOT_IMG_SIZE="${ROOT_IMG_SIZE:-5G}"
+ROOTFS_HOSTNAME="${ROOTFS_HOSTNAME:-umeko-gemini}"
+ROOTFS_USERNAME="${ROOTFS_USERNAME:-umeko}"
+ROOTFS_PASSWORD="${ROOTFS_PASSWORD:-1234}"
+ROOTFS_TIMEZONE="${ROOTFS_TIMEZONE:-Asia/Shanghai}"
 
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
@@ -27,6 +33,10 @@ export CC=aarch64-linux-gnu-gcc
 export DEBIAN_FRONTEND=noninteractive
 export KBUILD_BUILD_USER=codex
 export KBUILD_BUILD_HOST=github-actions
+
+chroot_run() {
+  sudo chroot "${CHROOT_DIR}" /usr/bin/qemu-aarch64-static /bin/bash -lc "$1"
+}
 
 cleanup() {
   set +e
@@ -41,7 +51,7 @@ cleanup() {
 trap cleanup EXIT
 
 rm -rf "${KPL_DIR}" "${ROOTFS_WORK_DIR}" "${OUT_DIR}"
-mkdir -p "${WORK_DIR}" "${ROOTFS_WORK_DIR}" "${UNPACK_DIR}" "${KERNEL_OUT_DIR}" "${FLASH_OUT_DIR}"
+mkdir -p "${WORK_DIR}" "${ROOTFS_WORK_DIR}" "${KERNEL_OUT_DIR}" "${FLASH_OUT_DIR}"
 sudo mkdir -p "${CHROOT_DIR}"
 
 git clone --depth 1 https://github.com/umeiko/KlipperPhonesLinux.git "${KPL_DIR}"
@@ -79,28 +89,41 @@ fi
 cp "${KERNEL_IMAGE_PATH}" "${KERNEL_OUT_DIR}/"
 find ./linux/arch/arm64/boot/dts/qcom -maxdepth 1 -type f -name "*gemini*.dtb" -exec cp {} "${KERNEL_OUT_DIR}/" \;
 
-curl -L --retry 5 --retry-delay 5 --output "${ROOT_IMG_ZIP}" "${BASE_ROOTFS_URL}"
-unzip -q "${ROOT_IMG_ZIP}" -d "${UNPACK_DIR}"
-
-ROOT_IMG_SOURCE="$(find "${UNPACK_DIR}" -maxdepth 2 -type f -name "*.img" | head -n 1)"
-if [ -z "${ROOT_IMG_SOURCE}" ]; then
-  echo "No root image found in ${ROOT_IMG_ZIP}" >&2
-  exit 1
-fi
-
+curl -L --retry 5 --retry-delay 5 --output "${UBUNTU_BASE_TAR}" "${UBUNTU_BASE_URL}"
 rm -f "${ROOT_IMG}"
-cp "${ROOT_IMG_SOURCE}" "${ROOT_IMG}"
+truncate -s "${ROOT_IMG_SIZE}" "${ROOT_IMG}"
+mkfs.ext4 -F -L rootfs "${ROOT_IMG}"
 
 sudo mount -o loop "${ROOT_IMG}" "${CHROOT_DIR}"
+sudo tar xpf "${UBUNTU_BASE_TAR}" -C "${CHROOT_DIR}"
 sudo mount --bind /proc "${CHROOT_DIR}/proc"
 sudo mount --bind /dev "${CHROOT_DIR}/dev"
 sudo mount --bind /dev/pts "${CHROOT_DIR}/dev/pts"
 sudo mount --bind /sys "${CHROOT_DIR}/sys"
 sudo cp /etc/resolv.conf "${CHROOT_DIR}/etc/resolv.conf"
+sudo tee "${CHROOT_DIR}/etc/apt/sources.list" >/dev/null <<EOF
+deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES} main restricted universe multiverse
+deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES}-updates main restricted universe multiverse
+deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES}-security main restricted universe multiverse
+deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES}-backports main restricted universe multiverse
+EOF
+sudo tee "${CHROOT_DIR}/etc/hostname" >/dev/null <<EOF
+${ROOTFS_HOSTNAME}
+EOF
+sudo tee "${CHROOT_DIR}/etc/hosts" >/dev/null <<EOF
+127.0.0.1 localhost
+127.0.1.1 ${ROOTFS_HOSTNAME}
 
-sudo cp ./*.deb "${CHROOT_DIR}/tmp/"
-sudo cp ./chroot_install_kernel.sh "${CHROOT_DIR}/tmp/install_kernel.sh"
-sudo chmod +x "${CHROOT_DIR}/tmp/install_kernel.sh"
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
+sudo tee "${CHROOT_DIR}/usr/sbin/policy-rc.d" >/dev/null <<'EOF'
+#!/bin/sh
+exit 101
+EOF
+sudo chmod +x "${CHROOT_DIR}/usr/sbin/policy-rc.d"
+sudo mkdir -p "${CHROOT_DIR}/etc/ssh/sshd_config.d"
 
 if [ ! -x "${QEMU_STATIC}" ]; then
   echo "qemu-aarch64-static is not installed" >&2
@@ -108,8 +131,22 @@ if [ ! -x "${QEMU_STATIC}" ]; then
 fi
 
 sudo cp "${QEMU_STATIC}" "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
-sudo chroot "${CHROOT_DIR}" /usr/bin/qemu-aarch64-static /bin/bash -lc \
-  "export DEBIAN_FRONTEND=noninteractive; cd /tmp; /bin/bash ./install_kernel.sh"
+chroot_run "apt-get update"
+chroot_run "apt-get install -y --no-install-recommends ubuntu-minimal systemd-sysv dbus sudo initramfs-tools openssh-server network-manager wpasupplicant rfkill iproute2 iputils-ping net-tools pciutils usbutils curl wget ca-certificates locales tzdata nano vim less kmod udev dialog bash-completion"
+chroot_run "ln -sf /usr/share/zoneinfo/${ROOTFS_TIMEZONE} /etc/localtime && echo '${ROOTFS_TIMEZONE}' >/etc/timezone && dpkg-reconfigure -f noninteractive tzdata"
+chroot_run "locale-gen en_US.UTF-8 zh_CN.UTF-8"
+chroot_run "echo 'root:${ROOTFS_PASSWORD}' | chpasswd"
+chroot_run "id -u ${ROOTFS_USERNAME} >/dev/null 2>&1 || useradd -m -s /bin/bash -G sudo,adm,dialout,netdev,audio,video,input ${ROOTFS_USERNAME}"
+chroot_run "echo '${ROOTFS_USERNAME}:${ROOTFS_PASSWORD}' | chpasswd"
+sudo tee "${CHROOT_DIR}/etc/ssh/sshd_config.d/99-codex.conf" >/dev/null <<'EOF'
+PasswordAuthentication yes
+PermitRootLogin yes
+UsePAM yes
+EOF
+chroot_run "systemctl enable ssh NetworkManager systemd-resolved"
+sudo cp ./*.deb "${CHROOT_DIR}/tmp/"
+chroot_run "cd /tmp && apt-get install -y ./linux*.deb"
+chroot_run "update-initramfs -c -k all || true"
 
 sudo rsync -a ../msm8996/firmware/ "${CHROOT_DIR}/lib/firmware/"
 if [ -d "${FIRMWARE_OVERLAY_DIR}" ]; then
@@ -198,6 +235,8 @@ cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${FLASH_OUT_DIR}/"
     echo "firmware_overlay=gemini-build/firmware-overlay"
   fi
   echo "build_flow=umeiko tutorial chain"
+  echo "rootfs_base=ubuntu-base-${UBUNTU_RELEASE}-arm64"
+  echo "rootfs_series=${UBUNTU_SERIES}"
   echo "cmdline=console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 splash"
 } > "${FLASH_OUT_DIR}/build-info.txt"
 
