@@ -28,6 +28,43 @@ export DEBIAN_FRONTEND=noninteractive
 export KBUILD_BUILD_USER=codex
 export KBUILD_BUILD_HOST=github-actions
 
+patch_reboot_chain_sources() {
+  python3 - "${LINUX_DIR}" <<'PY'
+from pathlib import Path
+import sys
+
+linux_dir = Path(sys.argv[1])
+pm8994 = linux_dir / "arch/arm64/boot/dts/qcom/pm8994.dtsi"
+msm8996 = linux_dir / "arch/arm64/boot/dts/qcom/msm8996.dtsi"
+
+pm_text = pm8994.read_text(encoding="utf-8")
+if "mode-normal = <0x0>;" not in pm_text:
+    pm_text = pm_text.replace(
+        "\t\t\treg = <0x800>;\n",
+        "\t\t\treg = <0x800>;\n\t\t\tmode-normal = <0x0>;\n",
+        1,
+    )
+    pm8994.write_text(pm_text, encoding="utf-8")
+
+msm_text = msm8996.read_text(encoding="utf-8")
+if 'compatible = "qcom,pshold";' not in msm_text:
+    insert = """
+\trestart@4ab000 {
+\t\tcompatible = "qcom,pshold";
+\t\treg = <0x0 0x4ab000 0x0 0x4>,
+\t\t      <0x0 0x7b3000 0x0 0x4>;
+\t\treg-names = "pshold-base", "tcsr-boot-misc-detect";
+\t};
+
+"""
+    last = msm_text.rfind("};")
+    if last == -1:
+        raise SystemExit("failed to locate root node end in msm8996.dtsi")
+    msm_text = msm_text[:last] + insert + msm_text[last:]
+    msm8996.write_text(msm_text, encoding="utf-8")
+PY
+}
+
 cleanup() {
   set +e
   sync
@@ -61,6 +98,7 @@ if [ -f ./drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c ] && \
   sed -i '/^#include <linux\/of_platform.h>$/a #include <linux/of.h>' \
     ./drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c
 fi
+patch_reboot_chain_sources
 make olddefconfig
 popd >/dev/null
 
@@ -197,6 +235,7 @@ cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${FLASH_OUT_DIR}/"
     echo "firmware_overlay=gemini-build/firmware-overlay"
   fi
   echo "build_flow=umeiko tutorial chain"
+  echo "reboot_fix=source patched pm8994.dtsi mode-normal + msm8996.dtsi qcom,pshold"
   echo "cmdline=console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 splash"
 } > "${FLASH_OUT_DIR}/build-info.txt"
 
