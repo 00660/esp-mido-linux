@@ -56,9 +56,9 @@ jobs:
                 e2fsprogs \
                 fakeroot \
                 flex \
+                android-sdk-libsparse-utils \
                 gcc-aarch64-linux-gnu \
                 git \
-                img2simg \
                 kernel-package \
                 kmod \
                 libdw-dev \
@@ -75,7 +75,6 @@ jobs:
                 python3 \
                 qemu-user-static \
                 rsync \
-                simg2img \
                 unzip \
                 zip \
                 xz-utils \
