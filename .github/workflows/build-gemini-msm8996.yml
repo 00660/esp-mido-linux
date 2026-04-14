@@ -6,7 +6,7 @@ on:
       kernel_tag:
         description: "msm8996-mainline tag"
         required: true
-        default: "v6.19.5-msm8996"
+        default: "v6.1.14-msm8996"
   push:
     paths:
       - ".github/workflows/build-gemini-msm8996.yml"
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
-      KERNEL_TAG: ${{ inputs.kernel_tag || 'v6.19.5-msm8996' }}
+      KERNEL_TAG: ${{ inputs.kernel_tag || 'v6.1.14-msm8996' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

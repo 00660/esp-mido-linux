@@ -16,8 +16,9 @@ FLASH_OUT_DIR="${OUT_DIR}/fullflash"
 TMP_MKBOOT_DIR="${SCRIPT_DIR}/tmp_mkboot"
 CHROOT_DIR="/mnt/chroot"
 BASE_ROOTFS_URL="${BASE_ROOTFS_URL:-https://github.com/umeiko/KlipperPhonesLinux/releases/download/base_rootfs/klipperos_base_rootfs.zip}"
-KERNEL_TAG="${KERNEL_TAG:-v6.19.5-msm8996}"
+KERNEL_TAG="${KERNEL_TAG:-v6.1.14-msm8996}"
 QEMU_STATIC="${QEMU_STATIC:-/usr/bin/qemu-aarch64-static}"
+RUNNING_CONFIG="${ROOT_DIR}/gemini-build/config-gemini-running-6.1.14-umeko-rv0"
 
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
@@ -47,7 +48,11 @@ git clone --depth 1 https://github.com/umeiko/KlipperPhonesLinux.git "${KPL_DIR}
 pushd "${SCRIPT_DIR}" >/dev/null
 
 git clone --depth 1 --branch "${KERNEL_TAG}" https://gitlab.com/msm8996-mainline/linux.git ./linux
-cp ../msm8996/.config_gemini ./linux/.config
+if [ -f "${RUNNING_CONFIG}" ]; then
+  cp "${RUNNING_CONFIG}" ./linux/.config
+else
+  cp ../msm8996/.config_gemini ./linux/.config
+fi
 
 pushd ./linux >/dev/null
 if [ -f ./drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c ] && \
@@ -179,7 +184,11 @@ cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${FLASH_OUT_DIR}/"
 {
   echo "kernel_tag=${KERNEL_TAG}"
   echo "rootfs_uuid=${ROOTFS_UUID}"
-  echo "base_config=umeiko/KlipperPhonesLinux LinuxKernels/msm8996/.config_gemini"
+  if [ -f "${RUNNING_CONFIG}" ]; then
+    echo "base_config=gemini-build/config-gemini-running-6.1.14-umeko-rv0"
+  else
+    echo "base_config=umeiko/KlipperPhonesLinux LinuxKernels/msm8996/.config_gemini"
+  fi
   echo "build_flow=umeiko tutorial chain"
   echo "cmdline=console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 splash"
 } > "${FLASH_OUT_DIR}/build-info.txt"
