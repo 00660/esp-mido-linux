@@ -38,6 +38,7 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/workspace" \
             ubuntu:20.04 \
             /bin/bash -lc '
+              set -euo pipefail
               apt-get update
               apt-get install -y \
                 sudo \
@@ -85,6 +86,12 @@ jobs:
               bash gemini-build/build-kernel.sh
               chmod -R a+rX /workspace/out || true
             '
+
+      - name: Verify Expected Outputs
+        run: |
+          test -s out/fullflash/boot.img
+          test -s out/fullflash/rootfs.img
+          test -s out/fullflash/rootfs-simg.img
 
       - name: Upload artifacts
         if: always()

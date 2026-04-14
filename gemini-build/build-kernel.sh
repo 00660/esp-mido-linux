@@ -50,6 +50,11 @@ git clone --depth 1 --branch "${KERNEL_TAG}" https://gitlab.com/msm8996-mainline
 cp ../msm8996/.config_gemini ./linux/.config
 
 pushd ./linux >/dev/null
+if [ -f ./drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c ] && \
+   ! grep -q '^#include <linux/of.h>$' ./drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c; then
+  sed -i '/^#include <linux\/of_platform.h>$/a #include <linux/of.h>' \
+    ./drivers/gpu/drm/panel/panel-sony-synaptics-jdi.c
+fi
 make olddefconfig
 popd >/dev/null
 
@@ -57,7 +62,15 @@ bash ./full_compile.sh
 
 find . -maxdepth 1 -type f -name "*.deb" -exec cp {} "${KERNEL_OUT_DIR}/" \;
 cp ./linux/.config "${KERNEL_OUT_DIR}/config-gemini-final"
-cp ./linux/arch/arm64/boot/Image.gz "${KERNEL_OUT_DIR}/"
+KERNEL_IMAGE_PATH="./linux/arch/arm64/boot/Image.gz"
+if [ ! -f "${KERNEL_IMAGE_PATH}" ]; then
+  KERNEL_IMAGE_PATH="./linux/arch/arm64/boot/Image"
+fi
+if [ ! -f "${KERNEL_IMAGE_PATH}" ]; then
+  echo "Failed to locate built kernel image" >&2
+  exit 1
+fi
+cp "${KERNEL_IMAGE_PATH}" "${KERNEL_OUT_DIR}/"
 find ./linux/arch/arm64/boot/dts/qcom -maxdepth 1 -type f -name "*gemini*.dtb" -exec cp {} "${KERNEL_OUT_DIR}/" \;
 
 curl -L --retry 5 --retry-delay 5 --output "${ROOT_IMG_ZIP}" "${BASE_ROOTFS_URL}"
@@ -122,14 +135,18 @@ cat > ./get_kernel_files.sh <<'EOF'
 mkdir ./tmp_mkboot
 rm -rf ./tmp_mkboot/*
 cp ./linux/arch/arm64/boot/dts/qcom/*gemini*.dtb ./tmp_mkboot/
-cp ./linux/arch/arm64/boot/Image.gz ./tmp_mkboot/
+if [ -f ./linux/arch/arm64/boot/Image.gz ]; then
+  cp ./linux/arch/arm64/boot/Image.gz ./tmp_mkboot/kernel.img
+else
+  cp ./linux/arch/arm64/boot/Image ./tmp_mkboot/kernel.img
+fi
 cp /mnt/chroot/boot/initrd* ./tmp_mkboot/
 EOF
 
 cat > ./mkboot.sh <<EOF
 cp ./tmp_mkboot/initrd* ./tmp_mkboot/initrd.img
 cp ./tmp_mkboot/*gemini*.dtb ./tmp_mkboot/dtb
-cat ./tmp_mkboot/Image.gz ./tmp_mkboot/dtb > ./tmp_mkboot/kernel-dtb
+cat ./tmp_mkboot/kernel.img ./tmp_mkboot/dtb > ./tmp_mkboot/kernel-dtb
 mkbootimg --base 0x80000000 \\
         --kernel_offset 0x00008000 \\
         --ramdisk_offset 0x01000000 \\
@@ -141,6 +158,7 @@ mkbootimg --base 0x80000000 \\
         --kernel ./tmp_mkboot/kernel-dtb -o ./tmp_mkboot/boot.img
 rm ./tmp_mkboot/dtb
 rm ./tmp_mkboot/kernel-dtb
+rm ./tmp_mkboot/kernel.img
 rm ./tmp_mkboot/initrd.img
 rm -f ./tmp_mkboot/rootfs.img
 img2simg ./root.img ./tmp_mkboot/rootfs.img
