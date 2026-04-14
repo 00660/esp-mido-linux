@@ -60,6 +60,7 @@ jobs:
                 cpio \
                 curl \
                 debhelper \
+                debootstrap \
                 dpkg-dev \
                 device-tree-compiler \
                 dwarves \

@@ -8,7 +8,6 @@ SCRIPT_DIR="${KPL_DIR}/LinuxKernels/scripts"
 LINUX_DIR="${SCRIPT_DIR}/linux"
 ROOTFS_WORK_DIR="${WORK_DIR}/rootfs"
 ROOT_IMG="${SCRIPT_DIR}/root.img"
-UBUNTU_BASE_TAR="${ROOTFS_WORK_DIR}/ubuntu-base-arm64.tar.gz"
 OUT_DIR="${ROOT_DIR}/out"
 KERNEL_OUT_DIR="${OUT_DIR}/kernel"
 FLASH_OUT_DIR="${OUT_DIR}/fullflash"
@@ -20,7 +19,7 @@ RUNNING_CONFIG="${ROOT_DIR}/gemini-build/config-gemini-running-6.1.14-umeko-rv0"
 FIRMWARE_OVERLAY_DIR="${ROOT_DIR}/gemini-build/firmware-overlay"
 UBUNTU_RELEASE="${UBUNTU_RELEASE:-25.10}"
 UBUNTU_SERIES="${UBUNTU_SERIES:-questing}"
-UBUNTU_BASE_URL="${UBUNTU_BASE_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/${UBUNTU_SERIES}/release/ubuntu-base-${UBUNTU_RELEASE}-base-arm64.tar.gz}"
+ROOTFS_MIRROR="${ROOTFS_MIRROR:-http://ports.ubuntu.com/ubuntu-ports}"
 ROOT_IMG_SIZE="${ROOT_IMG_SIZE:-5G}"
 ROOTFS_HOSTNAME="${ROOTFS_HOSTNAME:-umeko-gemini}"
 ROOTFS_USERNAME="${ROOTFS_USERNAME:-umeko}"
@@ -89,23 +88,22 @@ fi
 cp "${KERNEL_IMAGE_PATH}" "${KERNEL_OUT_DIR}/"
 find ./linux/arch/arm64/boot/dts/qcom -maxdepth 1 -type f -name "*gemini*.dtb" -exec cp {} "${KERNEL_OUT_DIR}/" \;
 
-curl -L --retry 5 --retry-delay 5 --output "${UBUNTU_BASE_TAR}" "${UBUNTU_BASE_URL}"
 rm -f "${ROOT_IMG}"
 truncate -s "${ROOT_IMG_SIZE}" "${ROOT_IMG}"
 mkfs.ext4 -F -L rootfs "${ROOT_IMG}"
 
 sudo mount -o loop "${ROOT_IMG}" "${CHROOT_DIR}"
-sudo tar xpf "${UBUNTU_BASE_TAR}" -C "${CHROOT_DIR}"
 sudo mount --bind /proc "${CHROOT_DIR}/proc"
 sudo mount --bind /dev "${CHROOT_DIR}/dev"
 sudo mount --bind /dev/pts "${CHROOT_DIR}/dev/pts"
 sudo mount --bind /sys "${CHROOT_DIR}/sys"
 sudo cp /etc/resolv.conf "${CHROOT_DIR}/etc/resolv.conf"
+sudo debootstrap --arch=arm64 --foreign "${UBUNTU_SERIES}" "${CHROOT_DIR}" "${ROOTFS_MIRROR}"
 sudo tee "${CHROOT_DIR}/etc/apt/sources.list" >/dev/null <<EOF
-deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES} main restricted universe multiverse
-deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES}-updates main restricted universe multiverse
-deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES}-security main restricted universe multiverse
-deb http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_SERIES}-backports main restricted universe multiverse
+deb ${ROOTFS_MIRROR} ${UBUNTU_SERIES} main restricted universe multiverse
+deb ${ROOTFS_MIRROR} ${UBUNTU_SERIES}-updates main restricted universe multiverse
+deb ${ROOTFS_MIRROR} ${UBUNTU_SERIES}-security main restricted universe multiverse
+deb ${ROOTFS_MIRROR} ${UBUNTU_SERIES}-backports main restricted universe multiverse
 EOF
 sudo tee "${CHROOT_DIR}/etc/hostname" >/dev/null <<EOF
 ${ROOTFS_HOSTNAME}
@@ -131,6 +129,7 @@ if [ ! -x "${QEMU_STATIC}" ]; then
 fi
 
 sudo cp "${QEMU_STATIC}" "${CHROOT_DIR}/usr/bin/qemu-aarch64-static"
+chroot_run "/debootstrap/debootstrap --second-stage"
 chroot_run "apt-get update"
 chroot_run "apt-get install -y --no-install-recommends ubuntu-minimal systemd-sysv dbus sudo initramfs-tools openssh-server network-manager wpasupplicant rfkill iproute2 iputils-ping net-tools pciutils usbutils curl wget ca-certificates locales tzdata nano vim less kmod udev dialog bash-completion"
 chroot_run "ln -sf /usr/share/zoneinfo/${ROOTFS_TIMEZONE} /etc/localtime && echo '${ROOTFS_TIMEZONE}' >/etc/timezone && dpkg-reconfigure -f noninteractive tzdata"
@@ -235,7 +234,7 @@ cp "${ROOT_DIR}/gemini-build/install-on-device.sh" "${FLASH_OUT_DIR}/"
     echo "firmware_overlay=gemini-build/firmware-overlay"
   fi
   echo "build_flow=umeiko tutorial chain"
-  echo "rootfs_base=ubuntu-base-${UBUNTU_RELEASE}-arm64"
+  echo "rootfs_base=debootstrap-ubuntu-${UBUNTU_RELEASE}-arm64"
   echo "rootfs_series=${UBUNTU_SERIES}"
   echo "cmdline=console=tty0 root=UUID=${ROOTFS_UUID} rw loglevel=3 splash"
 } > "${FLASH_OUT_DIR}/build-info.txt"
