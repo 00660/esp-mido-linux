@@ -40,6 +40,16 @@ jobs:
             /bin/bash -lc '
               set -euo pipefail
               apt-get update
+              install_if_available() {
+                local pkg
+                for pkg in "$@"; do
+                  if apt-cache show "$pkg" >/dev/null 2>&1; then
+                    apt-get install -y "$pkg"
+                    return 0
+                  fi
+                done
+                return 1
+              }
               apt-get install -y \
                 sudo \
                 bc \
@@ -56,10 +66,8 @@ jobs:
                 e2fsprogs \
                 fakeroot \
                 flex \
-                android-sdk-libsparse-utils \
                 gcc-aarch64-linux-gnu \
                 git \
-                kernel-package \
                 kmod \
                 libdw-dev \
                 libelf-dev \
@@ -70,7 +78,6 @@ jobs:
                 lz4 \
                 lzop \
                 make \
-                mkbootimg \
                 pkg-config \
                 python3 \
                 qemu-user-static \
@@ -79,6 +86,9 @@ jobs:
                 zip \
                 xz-utils \
                 zstd
+              install_if_available android-sdk-libsparse-utils img2simg
+              install_if_available mkbootimg
+              install_if_available kernel-package || true
               update-binfmts --enable qemu-aarch64 || true
               cd /workspace
               bash gemini-build/build-kernel.sh
